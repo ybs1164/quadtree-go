@@ -13,8 +13,6 @@ type Quadtree struct {
 
 type IBounds interface {
 	HitBox() *Bounds
-	IsPoint() bool
-	Intersects(Bounds) bool
 }
 
 // Bounds - A bounding box with a x,y origin and width and height
@@ -286,43 +284,6 @@ func (qt *Quadtree) Retrieve(pRect IBounds) []IBounds {
 	}
 
 	return returnObjects
-
-}
-
-// RetrievePoints - Return all points that collide
-func (qt *Quadtree) RetrievePoints(find IBounds) []IBounds {
-
-	var foundPoints []IBounds
-	potentials := qt.Retrieve(find)
-
-	rect := find.HitBox()
-
-	for o := 0; o < len(potentials); o++ {
-
-		// X and Ys are the same and it has no Width and Height (Point)
-		xyMatch := potentials[o].HitBox().X == float64(rect.X) && potentials[o].HitBox().Y == float64(rect.Y)
-		if xyMatch && potentials[o].IsPoint() {
-			foundPoints = append(foundPoints, find)
-		}
-	}
-
-	return foundPoints
-
-}
-
-// RetrieveIntersections - Bring back all the bounds in a Quadtree that intersect with a provided bounds
-func (qt *Quadtree) RetrieveIntersections(find IBounds) []IBounds {
-
-	var foundIntersections []IBounds
-
-	potentials := qt.Retrieve(find)
-	for o := 0; o < len(potentials); o++ {
-		if potentials[o].Intersects(*find.HitBox()) {
-			foundIntersections = append(foundIntersections, potentials[o])
-		}
-	}
-
-	return foundIntersections
 
 }
 
