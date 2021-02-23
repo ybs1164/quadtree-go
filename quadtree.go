@@ -6,9 +6,15 @@ type Quadtree struct {
 	MaxObjects int // Maximum objects a node can hold before splitting into 4 subnodes
 	MaxLevels  int // Total max levels inside root Quadtree
 	Level      int // Depth level, required for subnodes
-	Objects    []Bounds
+	Objects    []IBounds
 	Nodes      []Quadtree
 	Total      int
+}
+
+type IBounds interface {
+	HitBox() *Bounds
+	IsPoint() bool
+	Intersects(Bounds) bool
 }
 
 // Bounds - A bounding box with a x,y origin and width and height
@@ -103,7 +109,7 @@ func (qt *Quadtree) split() {
 		MaxObjects: qt.MaxObjects,
 		MaxLevels:  qt.MaxLevels,
 		Level:      nextLevel,
-		Objects:    make([]Bounds, 0),
+		Objects:    make([]IBounds, 0),
 		Nodes:      make([]Quadtree, 0, 4),
 	})
 
@@ -118,7 +124,7 @@ func (qt *Quadtree) split() {
 		MaxObjects: qt.MaxObjects,
 		MaxLevels:  qt.MaxLevels,
 		Level:      nextLevel,
-		Objects:    make([]Bounds, 0),
+		Objects:    make([]IBounds, 0),
 		Nodes:      make([]Quadtree, 0, 4),
 	})
 
@@ -133,7 +139,7 @@ func (qt *Quadtree) split() {
 		MaxObjects: qt.MaxObjects,
 		MaxLevels:  qt.MaxLevels,
 		Level:      nextLevel,
-		Objects:    make([]Bounds, 0),
+		Objects:    make([]IBounds, 0),
 		Nodes:      make([]Quadtree, 0, 4),
 	})
 
@@ -148,14 +154,16 @@ func (qt *Quadtree) split() {
 		MaxObjects: qt.MaxObjects,
 		MaxLevels:  qt.MaxLevels,
 		Level:      nextLevel,
-		Objects:    make([]Bounds, 0),
+		Objects:    make([]IBounds, 0),
 		Nodes:      make([]Quadtree, 0, 4),
 	})
 
 }
 
 // getIndex - Determine which quadrant the object belongs to (0-3)
-func (qt *Quadtree) getIndex(pRect Bounds) int {
+func (qt *Quadtree) getIndex(pRect IBounds) int {
+
+	rect := pRect.HitBox()
 
 	index := -1 // index of the subnode (0-3), or -1 if pRect cannot completely fit within a subnode and is part of the parent node
 
@@ -163,13 +171,13 @@ func (qt *Quadtree) getIndex(pRect Bounds) int {
 	horizontalMidpoint := qt.Bounds.Y + (qt.Bounds.Height / 2)
 
 	//pRect can completely fit within the top quadrants
-	topQuadrant := (pRect.Y < horizontalMidpoint) && (pRect.Y+pRect.Height < horizontalMidpoint)
+	topQuadrant := (rect.Y < horizontalMidpoint) && (rect.Y+rect.Height < horizontalMidpoint)
 
 	//pRect can completely fit within the bottom quadrants
-	bottomQuadrant := (pRect.Y > horizontalMidpoint)
+	bottomQuadrant := (rect.Y > horizontalMidpoint)
 
 	//pRect can completely fit within the left quadrants
-	if (pRect.X < verticalMidpoint) && (pRect.X+pRect.Width < verticalMidpoint) {
+	if (rect.X < verticalMidpoint) && (rect.X+rect.Width < verticalMidpoint) {
 
 		if topQuadrant {
 			index = 1
@@ -177,7 +185,7 @@ func (qt *Quadtree) getIndex(pRect Bounds) int {
 			index = 2
 		}
 
-	} else if pRect.X > verticalMidpoint {
+	} else if rect.X > verticalMidpoint {
 		//pRect can completely fit within the right quadrants
 
 		if topQuadrant {
@@ -194,7 +202,7 @@ func (qt *Quadtree) getIndex(pRect Bounds) int {
 
 // Insert - Insert the object into the node. If the node exceeds the capacity,
 // it will split and add all objects to their corresponding subnodes.
-func (qt *Quadtree) Insert(pRect Bounds) {
+func (qt *Quadtree) Insert(pRect IBounds) {
 
 	qt.Total++
 
@@ -248,7 +256,7 @@ func (qt *Quadtree) Insert(pRect Bounds) {
 }
 
 // Retrieve - Return all objects that could collide with the given object
-func (qt *Quadtree) Retrieve(pRect Bounds) []Bounds {
+func (qt *Quadtree) Retrieve(pRect IBounds) []IBounds {
 
 	index := qt.getIndex(pRect)
 
@@ -278,14 +286,17 @@ func (qt *Quadtree) Retrieve(pRect Bounds) []Bounds {
 }
 
 // RetrievePoints - Return all points that collide
-func (qt *Quadtree) RetrievePoints(find Bounds) []Bounds {
+func (qt *Quadtree) RetrievePoints(find IBounds) []IBounds {
 
-	var foundPoints []Bounds
+	var foundPoints []IBounds
 	potentials := qt.Retrieve(find)
+
+	rect := find.HitBox()
+
 	for o := 0; o < len(potentials); o++ {
 
 		// X and Ys are the same and it has no Width and Height (Point)
-		xyMatch := potentials[o].X == float64(find.X) && potentials[o].Y == float64(find.Y)
+		xyMatch := potentials[o].HitBox().X == float64(rect.X) && potentials[o].HitBox().Y == float64(rect.Y)
 		if xyMatch && potentials[o].IsPoint() {
 			foundPoints = append(foundPoints, find)
 		}
@@ -296,13 +307,13 @@ func (qt *Quadtree) RetrievePoints(find Bounds) []Bounds {
 }
 
 // RetrieveIntersections - Bring back all the bounds in a Quadtree that intersect with a provided bounds
-func (qt *Quadtree) RetrieveIntersections(find Bounds) []Bounds {
+func (qt *Quadtree) RetrieveIntersections(find IBounds) []IBounds {
 
-	var foundIntersections []Bounds
+	var foundIntersections []IBounds
 
 	potentials := qt.Retrieve(find)
 	for o := 0; o < len(potentials); o++ {
-		if potentials[o].Intersects(find) {
+		if potentials[o].Intersects(*find.HitBox()) {
 			foundIntersections = append(foundIntersections, potentials[o])
 		}
 	}
@@ -314,7 +325,7 @@ func (qt *Quadtree) RetrieveIntersections(find Bounds) []Bounds {
 //Clear - Clear the Quadtree
 func (qt *Quadtree) Clear() {
 
-	qt.Objects = []Bounds{}
+	qt.Objects = []IBounds{}
 
 	if len(qt.Nodes)-1 > 0 {
 		for i := 0; i < len(qt.Nodes); i++ {
