@@ -25,6 +25,10 @@ type Bounds struct {
 	Height float64
 }
 
+func (b *Bounds) HitBox() *Bounds {
+	return b
+}
+
 //IsPoint - Checks if a bounds object is a point or not (has no width or height)
 func (b *Bounds) IsPoint() bool {
 
